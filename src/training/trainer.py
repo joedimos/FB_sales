@@ -1,4 +1,3 @@
-# src/training/trainer.py
 import pandas as pd
 from sqlalchemy.orm import Session
 from src.storage.database import get_db, SessionLocal # Need SessionLocal for script usage
@@ -12,7 +11,7 @@ from sklearn.model_selection import train_test_split
 import joblib
 import os
 import datetime
-import numpy as np # For synthetic data
+import numpy as np
 
 MODEL_PATH = settings.get("model", {}).get("path")
 if MODEL_PATH is None:
