@@ -32,3 +32,50 @@ In a real system, this would be scheduled (e.g., via Airflow). For this demo, yo
 
 ```bash
 python -c "from src.ingestion.run_ingestion import run_connector_ingestion; run_connector_ingestion()"
+
+
+%% Stages of the process
+    Stage1[1. Lead Arrives]:::stage
+    Stage2[2. Data Collection & Storage]:::stage
+    Stage3[3. Historical Data Preparation]:::stage
+    Stage4[4. Model Training]:::stage
+    Stage5[5. New Lead Preparation]:::stage
+    Stage6[6. Likelihood Prediction]:::stage
+    Stage7[7. Actionable Insight]:::stage
+    Stage8[8. Feedback Loop]:::stage
+
+    %% Key Actors and Components
+    FB["Facebook Marketplace"]:::source
+    CRM["Dealership CRMs/DMS"]:::source
+    Database["Central Database (Your System)"]:::storage
+    DataPrep["Data Cleaning & Feature Engineering Logic"]:::process
+    MLModel[(Trained ML Model)]:::artifact
+    PredictionEngine["Prediction Service API"]:::service
+    Frontend["User Frontend Application"]:::ui
+    Staff[Dealership Sales Staff]:::user
+
+    %% Connections representing flow
+    FB --> Stage1
+    Stage1 --> CRM
+    CRM -- Ingestion --> Stage2
+    Stage2 -- Stores --> Database
+    Database -- Historical Data --> Stage3
+    Stage3 -- Prepared Data --> Stage4
+    Stage4 -- Creates --> MLModel
+    MLModel -- Used by --> Stage6
+    Database -- New Lead Data --> Stage5
+    Stage5 -- Prepared Data --> Stage6
+    Stage6 -- Predicted Score --> Stage7
+    Stage7 --> Frontend
+    Frontend -- Used by --> Staff
+    Staff -- Uses Score to Prioritize/Engage --> CRM
+
+    %% Feedback Loop
+    Stage6 -- Prediction Score --> Stage8
+    Stage8 --> CRM -- Updates Lead Record --> CRM
+
+    %% Implicit steps/relationships
+    Stage3 --> DataPrep -- Applied Here --> Stage4
+    Stage5 --> DataPrep -- Applied Here --> Stage6
+    PredictionEngine -- Hosts --> Stage6
+
