@@ -33,23 +33,23 @@ In a real system, this would be scheduled (e.g., via Airflow). For this demo, yo
 ```bash
 python -c "from src.ingestion.run_ingestion import run_connector_ingestion; run_connector_ingestion()"
 
-## **Lead Arrives**
+## Lead Arrives
 A potential car buyer generates a lead from Facebook Marketplace.  
 This lead is sent to the Dealership CRMs/DMS.
 
 ---
 
-### 1. **Data Ingestion**
+### 1. Data Ingestion
 - Connectors pull raw and updated lead, customer, vehicle, and interaction data from the Dealership CRMs/DMS.
 - This data is standardized and stored in your Central Database & Data Store.
 
 ---
 
-### 2. **Data Preparation**
+### 2. Data Preparation
 - Logic is applied to clean the data from the Central Database & Data Store.
 - Relevant features for prediction (e.g., lead age, vehicle details, interaction history counts) are created from the cleaned data.
 
-#### **Data Split Point**
+### Data Split Point
 The prepared data is split into two paths:
 - **Historical Data:** Used for training the model.
 - **New Lead Data:** Used for making real-time predictions.
@@ -67,12 +67,12 @@ The prepared data is split into two paths:
 
 ---
 
-### 4. **Result Integration**
+### 4. Result Integration
 - The Predicted Score is sent to the **CRM Writeback** component.
 - The CRM Writeback pushes the score back into the originating Dealership CRMs/DMS to update the lead record.
 
-#### **Actionable Insight & Feedback Loop**
-- The Predicted Score is displayed in a **User Frontend Application**.
+#### Actionable Insight & Feedback Loop
+- The Predicted Score is displayed in a User Frontend Application.
 - Dealership Sales Staff access the User Frontend to view the scores.
 - Staff use the score to prioritize and tailor their engagement with leads in the Dealership CRMs/DMS.
 - The outcome of the sales interactions (Sale/WON or Loss/LOST/STALE), recorded back in the Dealership CRMs/DMS, feeds back into the Central Database & Data Store as historical data—completing the feedback loop for future model retraining.
