@@ -39,12 +39,6 @@ This lead is sent to the Dealership CRMs/DMS.
 
 ---
 
-## Lead Arrives
-A potential car buyer generates a lead from Facebook Marketplace.  
-This lead is sent to the Dealership CRMs/DMS.
-
----
-
 ### 1. Data Ingestion
 - Connectors pull raw and updated lead, customer, vehicle, and interaction data from the Dealership CRMs/DMS.
 - This data is standardized and stored in your Central Database & Data Store.
