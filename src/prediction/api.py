@@ -1,101 +1,169 @@
 from fastapi import FastAPI, Depends, HTTPException
-from pydantic import BaseModel
-import joblib
-import os
-import pandas as pd
 from sqlalchemy.orm import Session
-from src.storage.database import get_db # Assuming get_db yields a session
-from src.storage.models import Lead, Vehicle # Assuming you'll fetch data by ID
+import pandas as pd
+import datetime
 
-# Define Pydantic model for incoming data (or use Lead ID)
-class LeadPredictInput(BaseModel):
-    # These fields should match the standardized data structure needed for feature engineering
-    crm_lead_id: str
-    crm_source: str
-    created_at: str # Or datetime object
-    vehicle_id: int
-    # Add all other necessary fields
+from src.storage.database import get_db
+from src.storage.models import Lead # Assuming you might want to update the lead in DB
+from src.prediction_service.schemas import LeadPredictInput, PredictionOutput
+from src.prediction_service.model_loader import load_model_pipeline, model_pipeline as loaded_model_pipeline # Import the global variable and loader
+from src.processing.feature_engineering import create_raw_features, NUMERICAL_FEATURES, CATEGORICAL_FEATURES # Import feature creation and column lists
+from src.crm_writeback.writeback_manager import writeback_score_to_crm # Import writeback function
 
-# --- Model Loading ---
-# Load model when the application starts
-MODEL_PATH = "models/latest_model_pipeline.joblib" # Path to saved pipeline
-model_pipeline = None # Global variable to hold the loaded model
 
-def load_model():
-    global model_pipeline
-    if os.path.exists(MODEL_PATH):
-        print(f"Loading model from {MODEL_PATH}")
-        model_pipeline = joblib.load(MODEL_PATH)
-        print("Model loaded successfully.")
-    else:
-        print(f"Model file not found at {MODEL_PATH}. Prediction service will not work.")
-        model_pipeline = None # Ensure it's None if file not found
+# --- FastAPI App Setup ---
+app = FastAPI(
+    title="FB Marketplace Lead Predictor API",
+    description="API for predicting the likelihood of a lead completing a transaction.",
+    version="0.1.0",
+)
 
-# Call load_model when app starts (FastAPI startup event)
-app = FastAPI()
-
+# --- Model Loading on Startup ---
 @app.on_event("startup")
 async def startup_event():
-    load_model()
+    """Load the model when the FastAPI app starts."""
+    global loaded_model_pipeline # Use the global variable
+    loaded_model_pipeline = load_model_pipeline()
+    if loaded_model_pipeline is None:
+        print("Startup failed: Could not load the model.")
+        # Depending on severity, you might want to raise an exception here
+        # to prevent the app from starting if prediction is critical.
+        # raise RuntimeError("Failed to load ML model")
 
-# --- API Endpoint ---
-@app.post("/predict")
+
+# --- Prediction Endpoint ---
+@app.post("/predict", response_model=PredictionOutput)
 async def predict_lead_likelihood(
     lead_data_input: LeadPredictInput,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db) # Get a DB session
 ):
-    if model_pipeline is None:
-        raise HTTPException(status_code=503, detail="Model not loaded.")
+    """
+    Receives lead data and returns a transaction likelihood score.
+    """
+    # Check if model is loaded
+    if loaded_model_pipeline is None:
+        raise HTTPException(status_code=503, detail="ML model is not loaded. Cannot make predictions.")
 
-    # Fetch additional data needed from DB using lead_data_input (e.g., vehicle details by vehicle_id)
-    # Or assume lead_data_input contains ALL necessary fields directly
+    # --- Data Preparation ---
+    # Convert Pydantic input to a Pandas DataFrame row
+    # This structure MUST match the data used for create_raw_features and training
+    input_data_dict = lead_data_input.dict()
 
-    # Example: Fetch data from DB using lead_data_input.crm_lead_id (need a mapping)
-    # For simplicity, let's assume input contains everything needed or you map it here
-    # In a real scenario, you'd fetch related data (vehicle, customer, interactions)
+    # Ensure expected datetime format
+    input_data_dict['created_at'] = input_data_dict['created_at'].replace(tzinfo=datetime.timezone.utc)
+    # input_data_dict['updated_at'] = input_data_dict['updated_at'].replace(tzinfo=datetime.timezone.utc) if input_data_dict.get('updated_at') else None
+    input_data_dict['time_of_prediction'] = input_data_dict['time_of_prediction'].replace(tzinfo=datetime.timezone.utc)
 
-    # For demo, convert input data to DataFrame row
-    # THIS MAPPING MUST MATCH WHAT create_features EXPECTS!
-    # Need to handle vehicle_id -> actual vehicle data here if not in input
-    # This part is oversimplified - needs actual data fetching/joining
-    lead_dict = lead_data_input.dict()
-    # Simulate fetching vehicle data by ID (replace with actual DB query)
-    vehicle = db.query(Vehicle).filter(Vehicle.id == lead_data_input.vehicle_id).first()
-    if not vehicle:
-         raise HTTPException(status_code=404, detail=f"Vehicle with ID {lead_data_input.vehicle_id} not found.")
 
-    # Merge data into a format suitable for feature engineering
-    combined_data = {**lead_dict, **vehicle.__dict__} # Merge lead and vehicle details
-    combined_data.pop('_sa_instance_state', None) # Clean up SQLAlchemy keys
-    df_row = pd.DataFrame([combined_data]) # Create a DataFrame with one row
+    df_row = pd.DataFrame([input_data_dict])
 
-    # Apply feature engineering (only the creation part, preprocessor is in the pipeline)
-    df_row_features = create_features(df_row.copy())
-
-    # Select the columns that the preprocessor/model expects
-    # This list of columns needs to be consistent with training
-    feature_cols = ['vehicle_price', 'vehicle_mileage', 'lead_age_hours', 'vehicle_make', 'lead_source_platform'] # Example
-    # Ensure all feature_cols are present in df_row_features, handle missing if necessary
+    # Apply the raw feature creation function
+    # This function needs to correctly handle the 'time_of_prediction' column
+    # to calculate lead_age_hours correctly for scoring *new* data.
     try:
-         X_predict = df_row_features[feature_cols]
+        df_row_features = create_raw_features(df_row.copy())
+    except Exception as e:
+        print(f"Error during raw feature creation: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error during feature engineering: {e}")
+
+
+    # Select the columns that the *preprocessor* inside the pipeline expects
+    # This list and order MUST match the columns fed into the preprocessor during training
+    # Ensure all expected columns are present, even if with dummy values (e.g., 0 or 'Unknown')
+    # if they weren't provided in the input. This is crucial for the preprocessor's ColumnTransformer.
+    # A more robust way is to define ALL possible input columns expected by raw_feature_creation
+    # and the preprocessor beforehand and ensure the input or fetching covers them.
+
+    # For this example, let's manually ensure the columns expected by the preprocessor exist
+    expected_input_cols_for_pipeline = NUMERICAL_FEATURES + CATEGORICAL_FEATURES
+
+    # Check for missing columns and add them if necessary (with default values, requires careful design)
+    # A better approach: the input schema/data fetching guarantees necessary fields.
+    # For demonstration, let's assume the input contains all required raw features.
+    # If not, you'd need more complex logic here to fetch missing data (e.g., from DB)
+    # or impute defaults before selecting columns for X_predict.
+
+    try:
+        # Select the columns needed for the preprocessor, ensuring order matches training
+        X_predict = df_row_features[expected_input_cols_for_pipeline]
     except KeyError as e:
-         raise HTTPException(status_code=400, detail=f"Missing expected feature column: {e}")
-
-    # Apply the trained pipeline (preprocessing + prediction)
-    # predict_proba gives the probability [prob_class_0, prob_class_1]
-    prediction_proba = model_pipeline.predict_proba(X_predict)[:, 1] # Get probability of class 1 (WON)
-    likelihood_score = float(prediction_proba[0]) # Extract the single score
-
-    # (Optional) Write back to CRM/DB
-    # from src.crm_writeback.writeback_manager import writeback_score_to_crm
-    # writeback_score_to_crm(lead_data_input.crm_source, lead_data_input.crm_lead_id, likelihood_score)
-    # Update score in your own database
-    lead_record = db.query(Lead).filter(Lead.crm_data_id == lead_data_input.crm_lead_id).first() # Needs proper mapping
-    if lead_record:
-         lead_record.predicted_likelihood = likelihood_score
-         db.commit()
+        print(f"Missing column(s) required for prediction: {e}")
+        raise HTTPException(status_code=400, detail=f"Missing required input data for feature engineering: {e}")
+    except Exception as e:
+         print(f"Error preparing prediction data: {e}")
+         raise HTTPException(status_code=500, detail=f"Internal error preparing data: {e}")
 
 
-    return {"crm_lead_id": lead_data_input.crm_lead_id, "likelihood_score": likelihood_score}
+    # --- Prediction ---
+    try:
+        # The pipeline handles both preprocessing and prediction
+        # predict_proba returns probabilities [P(class_0), P(class_1)]
+        prediction_proba = loaded_model_pipeline.predict_proba(X_predict)[:, 1] # Get probability of the positive class (1=WON)
+        likelihood_score = float(prediction_proba[0]) # Extract the single score
+    except Exception as e:
+        print(f"Error during model prediction: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error during prediction: {e}")
 
-# To run this API: uvicorn src.prediction_service.api:app --reload
+
+    # --- Post-Prediction Actions (Optional) ---
+    # 1. Write score back to your internal DB (Lead table)
+    # Assuming you can match the lead_data_input to a Lead record in your DB
+    try:
+        # Find the Lead record based on crm_lead_id and crm_source
+        # This assumes crm_lead_id is unique within a crm_source and mapped to your Lead table
+        lead_record = db.query(Lead).join(Lead.crm_data).filter(
+             CRMData.crm_lead_id == lead_data_input.crm_lead_id,
+             CRMData.crm_source == lead_data_input.crm_source
+        ).first()
+
+        if lead_record:
+            lead_record.predicted_likelihood = likelihood_score
+            db.commit()
+            db.refresh(lead_record) # Refresh to see updated value
+            print(f"Updated lead {lead_record.id} with score {likelihood_score}")
+        else:
+            print(f"Warning: Lead with crm_lead_id={lead_data_input.crm_lead_id}, crm_source={lead_data_input.crm_source} not found in internal DB for update.")
+            # In a real system, you might want to handle this - perhaps the lead hasn't been ingested yet?
+            # Or the mapping logic needs refinement.
+    except Exception as e:
+        db.rollback() # Rollback DB session on error
+        print(f"Error updating internal database with score: {e}")
+        # Decide if this error should prevent the API response or just log
+
+
+    # 2. Write score back to the originating CRM
+    try:
+        writeback_score_to_crm(
+            crm_source=lead_data_input.crm_source,
+            crm_lead_id=lead_data_input.crm_lead_id,
+            score=likelihood_score
+        )
+    except Exception as e:
+        print(f"Error writing score back to CRM {lead_data_input.crm_source}: {e}")
+        # Decide if this error should prevent the API response or just log
+
+
+    # --- Return Response ---
+    return PredictionOutput(
+        crm_lead_id=lead_data_input.crm_lead_id,
+        likelihood_score=likelihood_score
+    )
+
+# --- Health Check Endpoint (Optional but Recommended) ---
+@app.get("/health")
+async def health_check():
+    """Basic health check endpoint."""
+    status = "ok"
+    model_status = "loaded" if loaded_model_pipeline is not None else "not loaded"
+    db_status = "ok"
+    try:
+        db = next(get_db())
+        db.execute("SELECT 1") # Simple query to check DB connection
+    except Exception:
+        db_status = "error"
+        status = "degraded" # Or "error" if DB is critical
+
+    if loaded_model_pipeline is None:
+         status = "degraded" if status == "ok" else status # Stay 'error' if DB also failed
+
+    return {"status": status, "model": model_status, "database": db_status}
