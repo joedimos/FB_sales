@@ -1,63 +1,42 @@
 import abc
+from typing import List, Dict, Any
+import datetime
 
 class BaseCRMConnector(abc.ABC):
-    def __init__(self, config):
+    """Abstract base class for all CRM connectors."""
+    def __init__(self, config: Dict[str, Any]):
         self.config = config
-        self.connection = None
+        self.connection = None # Placeholder for connection object if needed
 
     @abc.abstractmethod
     def connect(self):
+        """Establishes connection to the CRM API/DB."""
         pass
 
     @abc.abstractmethod
-    def fetch_new_leads(self, last_fetch_time):
-        # Returns list of standardized lead dicts
+    def disconnect(self):
+        """Closes connection."""
         pass
 
     @abc.abstractmethod
-    def fetch_lead_details(self, lead_id):
-         # Returns standardized lead details dict
+    def fetch_new_leads(self, last_fetch_time: datetime.datetime) -> List[Dict[str, Any]]:
+        """
+        Fetches leads created or updated since last_fetch_time.
+        Returns a list of dictionaries in a standardized format.
+        """
+        pass
+
+    @abc.abstractmethod
+    def fetch_lead_details(self, lead_id: str) -> Dict[str, Any]:
+         """Fetches detailed information for a specific lead ID."""
          pass
 
     @abc.abstractmethod
-    def fetch_vehicle_details(self, vehicle_id):
-         # Returns standardized vehicle details dict
+    def fetch_vehicle_details(self, vehicle_id: str) -> Dict[str, Any]:
+         """Fetches detailed information for a specific vehicle ID."""
          pass
 
-# src/ingestion/vinsolutions_connector.py
-from .base import BaseCRMConnector
-import requests
-# Potentially Pydantic models for standardization
-
-class VinSolutionsConnector(BaseCRMConnector):
-    def connect(self):
-        # Use self.config to get API keys, endpoints
-        # Authenticate with VinSolutions API
-        print("Connecting to VinSolutions...")
-        self.connection = "VinSolutions API Session" # Placeholder
-
-    def fetch_new_leads(self, last_fetch_time):
-        # Implement VinSolutions API call to get leads since last_fetch_time
-        # Example:
-        api_url = self.config['api_url'] + '/leads'
-        params = {'created_since': last_fetch_time.isoformat()}
-        headers = {'Authorization': f'Bearer {self.config["api_key"]}'}
-        response = requests.get(api_url, params=params, headers=headers)
-        response.raise_for_status() # Raise an exception for bad status codes
-        raw_leads = response.json()['leads']
-
-        standardized_leads = []
-        for raw_lead in raw_leads:
-            # Map raw_lead fields to your standard format
-            standardized_lead = {
-                'lead_id': raw_lead.get('id'),
-                'crm_source': 'VinSolutions',
-                'created_at': raw_lead.get('createdAt'),
-                'status': raw_lead.get('status'),
-                'vehicle_id': raw_lead.get('vehicleId'), # Need to fetch details separately
-                'customer_id': raw_lead.get('customerId'),
-                'initial_message': raw_lead.get('initialMessage'), # From FBMP
-                # ... other relevant fields
-            }
-            standardized_leads.append(standardized_lead)
-        return standardized_leads
+    # Add methods for fetching interaction history, customer data, etc.
+    # @abc.abstractmethod
+    # def fetch_lead_interactions(self, lead_id: str) -> List[Dict[str, Any]]:
+    #      pass
