@@ -34,7 +34,7 @@ In a real system, this would be scheduled (e.g., via Airflow). For this demo, yo
 python -c "from src.ingestion.run_ingestion import run_connector_ingestion; run_connector_ingestion()"
 
 
-%% Stages of the process
+### Stages of the process
     Stage1[1. Lead Arrives]:::stage
     Stage2[2. Data Collection & Storage]:::stage
     Stage3[3. Historical Data Preparation]:::stage
@@ -44,7 +44,7 @@ python -c "from src.ingestion.run_ingestion import run_connector_ingestion; run_
     Stage7[7. Actionable Insight]:::stage
     Stage8[8. Feedback Loop]:::stage
 
-    %% Key Actors and Components
+### Key Actors and Components
     FB["Facebook Marketplace"]:::source
     CRM["Dealership CRMs/DMS"]:::source
     Database["Central Database (Your System)"]:::storage
@@ -54,7 +54,7 @@ python -c "from src.ingestion.run_ingestion import run_connector_ingestion; run_
     Frontend["User Frontend Application"]:::ui
     Staff[Dealership Sales Staff]:::user
 
-    %% Connections representing flow
+### Connections representing flow
     FB --> Stage1
     Stage1 --> CRM
     CRM -- Ingestion --> Stage2
@@ -70,11 +70,11 @@ python -c "from src.ingestion.run_ingestion import run_connector_ingestion; run_
     Frontend -- Used by --> Staff
     Staff -- Uses Score to Prioritize/Engage --> CRM
 
-    %% Feedback Loop
+### Feedback Loop
     Stage6 -- Prediction Score --> Stage8
     Stage8 --> CRM -- Updates Lead Record --> CRM
 
-    %% Implicit steps/relationships
+### Implicit steps/relationships
     Stage3 --> DataPrep -- Applied Here --> Stage4
     Stage5 --> DataPrep -- Applied Here --> Stage6
     PredictionEngine -- Hosts --> Stage6
