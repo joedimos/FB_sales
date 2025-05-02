@@ -1,24 +1,27 @@
-# src/crm_writeback/writeback_manager.py
-from .crm_apis.cdk_api import CdkWritebackAPI
 from .crm_apis.vinsolutions_api import VinSolutionsWritebackAPI
-# ... import others
+from .crm_apis.cdk_api import CdkWritebackAPI # Import placeholders
+from .crm_apis.reynolds_api import ReynoldsWritebackAPI
+
+# Map CRM source strings to their respective writeback API classes
+CRM_WRITEBACK_APIS = {
+    'VinSolutions': VinSolutionsWritebackAPI,
+    'CDK': CdkWritebackAPI,
+    'Reynolds': ReynoldsWritebackAPI,
+    # Add other CRMs here
+}
 
 def writeback_score_to_crm(crm_source: str, crm_lead_id: str, score: float):
-    """Routes the writeback call to the correct CRM API."""
-    if crm_source == 'CDK':
-        api = CdkWritebackAPI() # Needs config
-        api.update_lead_score(crm_lead_id, score)
-    elif crm_source == 'VinSolutions':
-        api = VinSolutionsWritebackAPI() # Needs config
-        api.update_lead_score(crm_lead_id, score)
-    # Add elif for other CRMs
+    """
+    Routes the writeback call to the correct CRM API based on source.
+    """
+    api_class = CRM_WRITEBACK_APIS.get(crm_source)
+
+    if api_class:
+        try:
+            api_instance = api_class()
+            api_instance.update_lead_score(crm_lead_id, score)
+        except Exception as e:
+            print(f"Error initializing or calling writeback API for {crm_source}: {e}")
+            # Log the error but don't necessarily re-raise
     else:
         print(f"Warning: No writeback API configured for CRM source: {crm_source}")
-
-# Example src/crm_writeback/crm_apis/vinsolutions_api.py
-# import requests
-# class VinSolutionsWritebackAPI:
-#    def update_lead_score(self, lead_id, score):
-#        # Call VinSolutions API to update lead field
-#        print(f"Writing back score {score} to VinSolutions lead {lead_id}")
-#        pass # Implementation using requests
