@@ -25,7 +25,7 @@ class VinSolutionsWritebackAPI:
         # endpoint = f"{self.api_url}/leads/{lead_id}"
         # headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
         # payload = {
-        #     "custom_field_name": "Predicted_Likelihood", # Replace with actual field name
+        #     "custom_field_name": "Predicted_Likelihood", 
         #     "value": f"{score:.4f}" # Format score as needed
         # }
         # try:
