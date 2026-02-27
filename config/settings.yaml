@@ -1,0 +1,22 @@
+database:
+  url: "sqlite:///fb_sales.db"
+  echo: false
+
+model:
+  path: "models/transaction_predictor.joblib"
+  min_training_samples: 50
+
+api:
+  host: "0.0.0.0"
+  port: 5000
+  debug: false
+
+logging:
+  level: "INFO"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+crm:
+  # In a real deployment, fill in actual CRM credentials
+  api_url: "https://crm.example.com/api"
+  api_key: "YOUR_CRM_API_KEY_HERE"
+  writeback_enabled: false  # Set to true when real CRM is configured
