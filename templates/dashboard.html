@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>LeadPilot — Marketplace Sales</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+  <script defer src="{{ url_for('static', filename='app.js') }}"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to lead workspace</a>
+<div class="shell">
+  <aside class="sidebar" aria-label="Primary navigation">
+    <a class="brand" href="/" aria-label="LeadPilot home"><span class="brand-mark" aria-hidden="true">LP</span><span>LeadPilot</span></a>
+    <nav>
+      <a class="nav-item active" href="#overview" aria-current="page">Overview</a>
+      <a class="nav-item" href="#leads">Leads</a>
+      <a class="nav-item" href="#insights">Insights</a>
+    </nav>
+    <div class="sidebar-note"><strong>Marketplace Predictor</strong><span>Prioritize the leads most likely to convert.</span></div>
+  </aside>
+
+  <main id="main">
+    <header class="topbar">
+      <div><p class="eyebrow">Sales workspace</p><h1>Marketplace leads</h1><p class="subtitle">Focus the team on the conversations most likely to become a sale.</p></div>
+      <div class="health" role="status"><span class="dot" aria-hidden="true"></span>System ready</div>
+    </header>
+
+    <section id="overview" class="metrics" aria-label="Lead summary">
+      <article class="metric"><span>Active leads</span><strong id="total">—</strong><small>in your pipeline</small></article>
+      <article class="metric"><span>High intent</span><strong id="hot">—</strong><small>75%+ likelihood</small></article>
+      <article class="metric"><span>Appointments</span><strong id="appointments">—</strong><small>scheduled / showed</small></article>
+      <article class="metric accent"><span>Average score</span><strong id="average_score">—</strong><small>conversion likelihood</small></article>
+    </section>
+
+    <section id="leads" class="panel" aria-labelledby="lead-heading">
+      <div class="panel-head">
+        <div><p class="eyebrow">Priority queue</p><h2 id="lead-heading">Lead inbox</h2></div>
+        <div class="controls">
+          <label class="search"><span class="sr-only">Search leads</span><input id="search" type="search" placeholder="Search lead, vehicle or message…" autocomplete="off"></label>
+          <label><span class="sr-only">Filter by status</span><select id="status"><option value="all">All statuses</option><option value="new">New</option><option value="contacted">Contacted</option><option value="appointment">Appointment</option><option value="showed">Showed</option><option value="test_drive">Test drive</option><option value="negotiation">Negotiation</option><option value="won">Won</option><option value="lost">Lost</option><option value="stale">Stale</option></select></label>
+        </div>
+      </div>
+      <div id="loading" class="state" role="status">Loading leads…</div>
+      <div id="empty" class="state" hidden>No leads match this view.</div>
+      <div class="table-wrap">
+        <table id="lead-table" hidden>
+          <caption class="sr-only">Marketplace sales leads sorted by predicted conversion likelihood</caption>
+          <thead><tr><th scope="col">Lead</th><th scope="col">Vehicle</th><th scope="col">Status</th><th scope="col">Likelihood</th><th scope="col">Message</th></tr></thead>
+          <tbody id="lead-rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="insights" class="callout" aria-labelledby="insights-heading"><div><p class="eyebrow">How to use this view</p><h2 id="insights-heading">Start at the top.</h2></div><p>Likelihood is a prioritization signal, not a guarantee. Combine it with customer context, response recency and dealership judgment.</p></section>
+  </main>
+</div>
+</body>
+</html>
